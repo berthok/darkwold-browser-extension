@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "DarkWold",
+  "version": "1.0.0",
+  "description": "Transforms WoldianGames pages to a cleaner, more readable dark-themed format with improved post structure and BBCode tools",
+  "author": "Berthok",
+  "homepage_url": "https://github.com/berthok/darkwold-browser-extension",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "activeTab"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.woldiangames.com/games/index.php*",
+        "https://www.woldiangames.com/archives/index.php*",
+        "https://www.woldiangames.com/woldiangames.htm",
+        "https://www.woldiangames.com/games_index_career.htm",
+        "https://www.woldiangames.com/games_index_gg_tap.htm",
+        "https://www.woldiangames.com/games_index_discussion.htm",
+        "https://www.woldiangames.com/welcome/welcome.html"
+      ],
+      "css": ["styles.css"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ]
+}
+
