@@ -1,4 +1,4 @@
-# WoldianGames - DarkWold
+# DarkWold
 
 A browser extension for Firefox and Chrome that transforms WoldianGames pages into a cleaner, more readable dark-themed format.
 
