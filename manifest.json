@@ -5,6 +5,15 @@
   "description": "Transforms WoldianGames pages to a cleaner, more readable dark-themed format with improved post structure and BBCode tools",
   "author": "Berthok",
   "homepage_url": "https://github.com/berthok/darkwold-browser-extension",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "darkwold@berthok",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
