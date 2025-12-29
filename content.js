@@ -1670,8 +1670,8 @@
             }
         }
         
-        // Check periodically (every 60 seconds to avoid too many requests)
-        checkInterval = setInterval(checkForNewPosts, 60000);
+        // Check periodically (every 2 minutes to avoid too many requests)
+        checkInterval = setInterval(checkForNewPosts, 120000);
         
         // Also check after DOM mutations (hooked into existing observer via transformPage calls)
         // This will be called by the existing MutationObserver
