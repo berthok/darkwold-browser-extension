@@ -3,6 +3,15 @@
 (function() {
     'use strict';
 
+    // New post detection state
+    let initialMostRecentDatetime = null;
+    let currentMostRecentDatetime = null;
+    let newPostsDetected = false;
+    let postDetectionInitialized = false;
+    let userStartedWriting = false;
+    let datetimeWhenWritingStarted = null;
+    let isSubmitting = false; // Flag to prevent double-submission
+
     // Wait for DOM to be fully loaded
     function init() {
         const body = document.body;
@@ -16,8 +25,13 @@
         document.body.classList.add('wold-transformed');
         
         // Check if this is a game/index page (has character posts)
+        // Handle both single and double slash in URLs
         const isGamePage = window.location.href.includes('/games/index.php') || 
-                          window.location.href.includes('/archives/index.php');
+                          window.location.href.includes('/archives/index.php') ||
+                          window.location.href.includes('//archives/index.php');
+        
+        // Check if this is an edit post page
+        const isEditPostPage = window.location.href.includes('/include/layout/editPost.php');
         
         if (isGamePage) {
             // Transform character posts
@@ -34,6 +48,20 @@
             
             // Transform spoiler tags in posts
             transformSpoilerTags();
+            
+            // Initialize new post detection
+            initializeNewPostDetection();
+        }
+        
+        if (isEditPostPage) {
+            // Add BBCode toolbar to edit form
+            addBBCodeToolbar();
+            
+            // Transform the edit form layout
+            const form = document.querySelector('form[name="postForm"]');
+            if (form) {
+                transformFormLayout(form);
+            }
         }
         
         // Transform navigation and headers (applies to all pages)
@@ -453,6 +481,9 @@
             formContainer.style.visibility = 'visible';
         }
         
+        // Transform form from table to modern div-based layout
+        transformFormLayout(form);
+        
         // Mark all cells first
         const rows = Array.from(form.querySelectorAll('tr'));
         rows.forEach(row => {
@@ -520,6 +551,268 @@
                 }
             }
         });
+    }
+    
+    function transformFormLayout(form) {
+        // Check if already transformed
+        if (form.classList.contains('form-transformed')) {
+            return;
+        }
+        
+        // Find the inner table that contains the form fields
+        // Edit post forms might have different table structure
+        const innerTable = form.querySelector('table[summary="post entry form"], table[summary="post entry table"], form > table');
+        if (!innerTable) {
+            // If no table found, the form might already be transformed or use a different structure
+            // Try to find any table in the form
+            const anyTable = form.querySelector('table');
+            if (!anyTable) {
+                return;
+            }
+        }
+        
+        // Create new container structure
+        const formWrapper = document.createElement('div');
+        formWrapper.className = 'modern-form-wrapper';
+        
+        // Extract form elements (hidden inputs will remain in the form)
+        const postNameInput = form.querySelector('#post_name, input[name="post_name"]');
+        const dieRollsDiv = form.querySelector('#rollsdiv');
+        const dieRollsTextarea = form.querySelector('textarea[name="die_rolls"]'); // Edit post form uses textarea
+        const explanationDiv = form.querySelector('#explanation');
+        // Get all dice buttons - they might be in different structures
+        const allDiceButtons = Array.from(form.querySelectorAll('input[type="button"][value^="d"], .diebutton'));
+        const clickRollButtons = allDiceButtons.filter(btn => {
+            const row = btn.closest('tr');
+            return row && (row.textContent.includes('Click&Roll') || row.textContent.includes('Click&amp;Roll'));
+        });
+        const messageTextarea = form.querySelector('#message, textarea[name="message"]');
+        const bbcodeToolbar = form.querySelector('#bbcode-toolbar');
+        const previewContainer = form.querySelector('#bbcode-preview');
+        const previewWrapper = form.querySelector('.preview-wrapper');
+        const previewButton = form.querySelector('#preview-btn');
+        const privatePostCheckbox = form.querySelector('input[name="privatePost"]');
+        const submitButton = form.querySelector('input[type="submit"], input.submit, button.submit');
+        const errorDiv = form.querySelector('#errorsFound');
+        
+        // Build new structure
+        // Error message
+        if (errorDiv) {
+            const errorSection = document.createElement('div');
+            errorSection.className = 'form-section form-error-section';
+            errorSection.appendChild(errorDiv);
+            formWrapper.appendChild(errorSection);
+        }
+        
+        // Post Name
+        if (postNameInput) {
+            const section = document.createElement('div');
+            section.className = 'form-section';
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.innerHTML = '<b>Post Name:</b>';
+            label.setAttribute('for', 'post_name');
+            const inputWrapper = document.createElement('div');
+            inputWrapper.className = 'form-input-wrapper';
+            inputWrapper.appendChild(postNameInput);
+            section.appendChild(label);
+            section.appendChild(inputWrapper);
+            formWrapper.appendChild(section);
+        }
+        
+        // Die Rolls - handle both div (new posts) and textarea (edit posts)
+        if (dieRollsDiv || dieRollsTextarea) {
+            const section = document.createElement('div');
+            section.className = 'form-section';
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.innerHTML = '<b>Die Rolls:</b>';
+            const rollsWrapper = document.createElement('div');
+            rollsWrapper.className = 'form-input-wrapper';
+            if (dieRollsDiv) {
+                rollsWrapper.appendChild(dieRollsDiv);
+            } else if (dieRollsTextarea) {
+                rollsWrapper.appendChild(dieRollsTextarea);
+            }
+            
+            // Preserve the hidden die_rolls input - it must stay in the form for submission
+            const dieRollsHiddenInput = form.querySelector('#die_rolls, input[name="die_rolls"]');
+            if (dieRollsHiddenInput) {
+                // Keep it in the form, not in the wrapper
+                // The dice buttons should still reference it correctly
+            }
+            
+            if (explanationDiv) {
+                rollsWrapper.appendChild(explanationDiv);
+            }
+            section.appendChild(label);
+            section.appendChild(rollsWrapper);
+            formWrapper.appendChild(section);
+        }
+        
+        // Click & Roll - preserve all dice buttons
+        // Get all dice buttons (both .diebutton class and input buttons with dice values)
+        const allDiceButtonsForClickRoll = Array.from(form.querySelectorAll('input[type="button"][value^="d"], .diebutton')).filter(btn => {
+            const value = btn.value || '';
+            // Check if it's a dice button (d100, d20, etc.) and not the Roll button
+            return value.match(/^d\d+$/i) && !btn.closest('tr')?.textContent.includes('MultiRoll');
+        });
+        
+        if (allDiceButtonsForClickRoll.length > 0 || clickRollButtons.length > 0) {
+            const section = document.createElement('div');
+            section.className = 'form-section';
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.innerHTML = '<b>Click&Roll:</b>';
+            const buttonsWrapper = document.createElement('div');
+            buttonsWrapper.className = 'form-controls-wrapper dice-buttons-wrapper';
+            
+            // Use clickRollButtons if available, otherwise use all dice buttons
+            const buttonsToMove = clickRollButtons.length > 0 ? clickRollButtons : allDiceButtonsForClickRoll;
+            buttonsToMove.forEach(btn => {
+                // Move button to new location (preserves event handlers)
+                buttonsWrapper.appendChild(btn);
+            });
+            section.appendChild(label);
+            section.appendChild(buttonsWrapper);
+            formWrapper.appendChild(section);
+        }
+        
+        // MultiRoll - handle both new post form and edit post form field names
+        const multiRollRow = Array.from(form.querySelectorAll('tr')).find(tr => 
+            tr.textContent.includes('MultiRoll')
+        );
+        if (multiRollRow) {
+            const section = document.createElement('div');
+            section.className = 'form-section';
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.innerHTML = '<b>MultiRoll:</b>';
+            const controlsWrapper = document.createElement('div');
+            controlsWrapper.className = 'form-controls-wrapper multiroll-wrapper';
+            
+            // Try new post form field names first, then edit post form names
+            const numDice = form.querySelector('#numdice, input[name="numdice"], input[name="numDie"]');
+            const dieSides = form.querySelector('#diesides, select[name="diesides"], select[name="dieSides"]');
+            const dieModifier = form.querySelector('#diemodifier, select[name="diemodifier"], select[name="dieMod"]');
+            const rollButton = form.querySelector('#multiroll, input[type="button"][value="Roll"]');
+            
+            if (numDice) controlsWrapper.appendChild(numDice);
+            if (dieSides) controlsWrapper.appendChild(dieSides);
+            if (dieModifier) controlsWrapper.appendChild(dieModifier);
+            if (rollButton) controlsWrapper.appendChild(rollButton);
+            
+            section.appendChild(label);
+            section.appendChild(controlsWrapper);
+            formWrapper.appendChild(section);
+        }
+        
+        // Message
+        if (messageTextarea) {
+            const section = document.createElement('div');
+            section.className = 'form-section';
+            const labelWrapper = document.createElement('div');
+            labelWrapper.className = 'form-label-wrapper';
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.innerHTML = '<b>Message:</b>';
+            label.setAttribute('for', 'message');
+            labelWrapper.appendChild(label);
+            if (previewButton) {
+                labelWrapper.appendChild(previewButton);
+            }
+            const inputWrapper = document.createElement('div');
+            inputWrapper.className = 'form-input-wrapper';
+            if (bbcodeToolbar) {
+                inputWrapper.appendChild(bbcodeToolbar);
+            }
+            inputWrapper.appendChild(messageTextarea);
+            section.appendChild(labelWrapper);
+            section.appendChild(inputWrapper);
+            formWrapper.appendChild(section);
+            
+            // Preview
+            if (previewWrapper || previewContainer) {
+                const previewSection = document.createElement('div');
+                previewSection.className = 'form-section form-preview-section';
+                if (previewWrapper) {
+                    previewSection.appendChild(previewWrapper);
+                } else if (previewContainer) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'preview-wrapper';
+                    wrapper.appendChild(previewContainer);
+                    previewSection.appendChild(wrapper);
+                }
+                formWrapper.appendChild(previewSection);
+            }
+        }
+        
+        // Private Post checkbox
+        if (privatePostCheckbox) {
+            const section = document.createElement('div');
+            section.className = 'form-section form-checkbox-section';
+            const checkboxWrapper = document.createElement('div');
+            checkboxWrapper.className = 'form-checkbox-wrapper';
+            checkboxWrapper.appendChild(privatePostCheckbox);
+            const checkboxLabel = document.createElement('label');
+            checkboxLabel.innerHTML = '<b>Post Private to DMs</b>';
+            checkboxLabel.setAttribute('for', privatePostCheckbox.id || 'privatePost');
+            checkboxWrapper.appendChild(checkboxLabel);
+            section.appendChild(checkboxWrapper);
+            formWrapper.appendChild(section);
+        }
+        
+        // Submit button
+        if (submitButton) {
+            const section = document.createElement('div');
+            section.className = 'form-section form-submit-section';
+            section.appendChild(submitButton);
+            formWrapper.appendChild(section);
+        }
+        
+        // Before replacing, ensure die_rolls hidden input is preserved
+        const dieRollsHiddenInput = form.querySelector('#die_rolls, input[name="die_rolls"]');
+        let dieRollsInputPreserved = null;
+        if (dieRollsHiddenInput) {
+            // Clone it to preserve it
+            dieRollsInputPreserved = dieRollsHiddenInput.cloneNode(true);
+        }
+        
+        // Replace the table structure with new div structure
+        const outerTable = form.querySelector('table[summary="post entry table"]');
+        if (outerTable) {
+            outerTable.parentNode.replaceChild(formWrapper, outerTable);
+        } else if (innerTable) {
+            innerTable.parentNode.replaceChild(formWrapper, innerTable);
+        }
+        
+        // Ensure die_rolls hidden input is in the form (critical for dice roll submission)
+        if (dieRollsInputPreserved) {
+            // Check if it still exists (might have been moved)
+            const existingInput = form.querySelector('#die_rolls, input[name="die_rolls"]');
+            if (!existingInput) {
+                // Re-add it to the form
+                form.appendChild(dieRollsInputPreserved);
+            }
+        } else {
+            // Create it if it doesn't exist
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.id = 'die_rolls';
+            hiddenInput.name = 'die_rolls';
+            hiddenInput.value = '';
+            form.appendChild(hiddenInput);
+        }
+        
+        // Ensure all other hidden inputs remain in the form
+        const allHiddenInputs = formWrapper.querySelectorAll('input[type="hidden"]');
+        allHiddenInputs.forEach(input => {
+            // Move hidden inputs to the form element itself
+            form.appendChild(input);
+        })
+        
+        // Mark as transformed
+        form.classList.add('form-transformed');
     }
 
     function styleSpecialElements() {
@@ -721,6 +1014,11 @@
         const postLinks = document.querySelectorAll('.character-post a[href], .post-header-section a[href]');
         
         postLinks.forEach(link => {
+            // Skip javascript: links (like Edit Post buttons) - they need to execute in the same window
+            if (link.href && link.href.toLowerCase().startsWith('javascript:')) {
+                return;
+            }
+            
             // Only modify links that have an href and aren't already set to open in new tab
             if (link.href && link.target !== '_blank') {
                 link.target = '_blank';
@@ -942,6 +1240,10 @@
             transformPage();
             // Specifically ensure form is visible
             ensureFormVisible();
+            // Check for new posts if detection is initialized
+            if (postDetectionInitialized && typeof window.checkForNewPosts === 'function') {
+                window.checkForNewPosts();
+            }
         }, 100);
     });
     
@@ -1010,5 +1312,711 @@
             addBBCodeToolbar();
         }
     }, 3000);
+    
+    // New post detection functions
+    function parseDatetime(datetimeString) {
+        // Parse datetime strings like "Monday December 8th, 2025 5:26:43 PM"
+        // or "Wednesday December 10th, 2025 4:19:33 AM"
+        if (!datetimeString || !datetimeString.trim()) {
+            return null;
+        }
+        
+        try {
+            // Remove ordinal suffixes (st, nd, rd, th) from day numbers
+            let cleaned = datetimeString.trim().replace(/(\d+)(st|nd|rd|th)/g, '$1');
+            
+            // Parse the format explicitly for reliability
+            // Format: "Monday December 8, 2025 5:26:43 PM"
+            const match = cleaned.match(/(\w+day)\s+(\w+)\s+(\d+),\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(AM|PM)/i);
+            if (match) {
+                const [, dayOfWeek, month, day, year, hour, minute, second, ampm] = match;
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                                  'July', 'August', 'September', 'October', 'November', 'December'];
+                const monthIndex = monthNames.findIndex(m => m.toLowerCase() === month.toLowerCase());
+                
+                if (monthIndex !== -1) {
+                    let hour24 = parseInt(hour, 10);
+                    if (ampm.toUpperCase() === 'PM' && hour24 !== 12) {
+                        hour24 += 12;
+                    } else if (ampm.toUpperCase() === 'AM' && hour24 === 12) {
+                        hour24 = 0;
+                    }
+                    
+                    const date = new Date(parseInt(year, 10), monthIndex, parseInt(day, 10), 
+                                         hour24, parseInt(minute, 10), parseInt(second, 10));
+                    
+                    // Check if date is valid
+                    if (!isNaN(date.getTime())) {
+                        return date;
+                    }
+                }
+            }
+            
+            // Fallback: try JavaScript Date constructor
+            let date = new Date(cleaned);
+            if (!isNaN(date.getTime())) {
+                return date;
+            }
+            
+            console.warn('Could not parse datetime:', datetimeString);
+            return null;
+        } catch (e) {
+            console.error('Error parsing datetime:', datetimeString, e);
+            return null;
+        }
+    }
+    
+    function getMostRecentPostDatetime() {
+        // Get all post datetime elements
+        const datetimeElements = document.querySelectorAll('.post-datetime');
+        let mostRecent = null;
+        let mostRecentDate = null;
+        
+        console.log('getMostRecentPostDatetime: Found', datetimeElements.length, 'datetime elements');
+        
+        datetimeElements.forEach((element, index) => {
+            const datetimeText = element.textContent.trim();
+            const date = parseDatetime(datetimeText);
+            
+            console.log(`  Element ${index}: "${datetimeText}" ->`, date);
+            
+            if (date && (!mostRecentDate || date > mostRecentDate)) {
+                mostRecent = datetimeText;
+                mostRecentDate = date;
+            }
+        });
+        
+        console.log('Most recent datetime:', mostRecent, mostRecentDate);
+        return { text: mostRecent, date: mostRecentDate };
+    }
+    
+    function getNewPostCount() {
+        // Count how many posts are newer than the reference datetime
+        const referenceDatetime = userStartedWriting ? datetimeWhenWritingStarted : initialMostRecentDatetime;
+        if (!referenceDatetime) {
+            console.log('getNewPostCount: No reference datetime available');
+            return 0;
+        }
+        
+        console.log('getNewPostCount: Reference datetime:', referenceDatetime);
+        
+        const datetimeElements = document.querySelectorAll('.post-datetime');
+        let newPostCount = 0;
+        
+        datetimeElements.forEach((element, index) => {
+            const datetimeText = element.textContent.trim();
+            const date = parseDatetime(datetimeText);
+            
+            if (date) {
+                const isNewer = date > referenceDatetime;
+                console.log(`  Post ${index}: "${datetimeText}" (${date}) is ${isNewer ? 'NEWER' : 'older or equal'} than reference`);
+                if (isNewer) {
+                    newPostCount++;
+                }
+            }
+        });
+        
+        console.log('getNewPostCount: Found', newPostCount, 'new posts');
+        return newPostCount;
+    }
+    
+    function initializeNewPostDetection() {
+        if (postDetectionInitialized) return;
+        postDetectionInitialized = true;
+        
+        // Get initial most recent datetime after posts are transformed
+        // Try multiple times to ensure posts are fully loaded and transformed
+        const tryInitialize = (attempt = 1) => {
+            const mostRecent = getMostRecentPostDatetime();
+            
+            if (!mostRecent.date && attempt < 5) {
+                // Posts might not be transformed yet, try again
+                console.log(`Initialization attempt ${attempt}: No datetimes found yet, retrying...`);
+                setTimeout(() => tryInitialize(attempt + 1), 500);
+                return;
+            }
+            
+            if (mostRecent.date) {
+                initialMostRecentDatetime = mostRecent.date;
+                currentMostRecentDatetime = mostRecent.date;
+                datetimeWhenWritingStarted = mostRecent.date;
+                console.log('New post detection initialized. Most recent post datetime:', mostRecent.text, mostRecent.date);
+            } else {
+                console.warn('New post detection initialized but no datetimes found. Detection may not work correctly.');
+            }
+            
+            // Set up form submission interception
+            interceptFormSubmission();
+            
+            // Monitor for new posts
+            monitorForNewPosts();
+            
+            // Track when user starts writing
+            trackUserWriting();
+        };
+        
+        // Start initialization after a delay
+        setTimeout(() => tryInitialize(1), 1000);
+    }
+    
+    function trackUserWriting() {
+        // Track when user starts interacting with the form
+        const form = document.querySelector('form[name="postForm"]');
+        if (!form) {
+            setTimeout(trackUserWriting, 1000);
+            return;
+        }
+        
+        const messageTextarea = form.querySelector('textarea[name="message"], #message');
+        const postNameInput = form.querySelector('input[name="post_name"], #post_name');
+        
+        const markWritingStarted = () => {
+            if (!userStartedWriting) {
+                userStartedWriting = true;
+                const mostRecent = getMostRecentPostDatetime();
+                datetimeWhenWritingStarted = mostRecent.date;
+                console.log('User started writing. Most recent post datetime at start:', mostRecent.text, mostRecent.date);
+                if (!datetimeWhenWritingStarted) {
+                    console.warn('Warning: Could not get datetime when writing started. New post detection may not work correctly.');
+                }
+            }
+        };
+        
+        if (messageTextarea) {
+            messageTextarea.addEventListener('input', markWritingStarted, { once: true });
+            messageTextarea.addEventListener('focus', markWritingStarted, { once: true });
+        }
+        
+        if (postNameInput) {
+            postNameInput.addEventListener('input', markWritingStarted, { once: true });
+            postNameInput.addEventListener('focus', markWritingStarted, { once: true });
+        }
+    }
+    
+    function fetchLatestPostDatetimes() {
+        // Fetch the current page to check for new posts
+        return fetch(window.location.href, {
+            method: 'GET',
+            cache: 'no-cache',
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text();
+        })
+        .then(html => {
+            // Parse the HTML to extract datetime information
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Find all datetime strings in the fetched HTML
+            // Look for font elements with size="-1" that contain datetime patterns
+            // Format: <font size="-1"><br>Monday December 8th, 2025 5:26:43 PM</font>
+            const datetimePattern = /\w+day\s+\w+\s+\d+[a-z]{0,2},\s+\d{4}\s+\d+:\d+:\d+\s+(AM|PM)/i;
+            const datetimes = [];
+            const seenDatetimes = new Set(); // To avoid duplicates
+            
+            // Search in font elements (original format before transformation)
+            const fontElements = doc.querySelectorAll('font[size="-1"]');
+            fontElements.forEach(font => {
+                // Get text content (this will include text after <br> tags)
+                const text = font.textContent || '';
+                const match = text.match(datetimePattern);
+                if (match) {
+                    // Extract the datetime string
+                    const datetimeText = match[0].trim();
+                    if (!seenDatetimes.has(datetimeText)) {
+                        seenDatetimes.add(datetimeText);
+                        const date = parseDatetime(datetimeText);
+                        if (date) {
+                            datetimes.push({ text: datetimeText, date: date });
+                        }
+                    }
+                }
+            });
+            
+            // Also search the raw HTML string for datetime patterns (more reliable)
+            const htmlMatches = html.match(new RegExp(datetimePattern.source, 'gi'));
+            if (htmlMatches) {
+                htmlMatches.forEach(match => {
+                    const datetimeText = match.trim();
+                    if (!seenDatetimes.has(datetimeText)) {
+                        seenDatetimes.add(datetimeText);
+                        const date = parseDatetime(datetimeText);
+                        if (date) {
+                            datetimes.push({ text: datetimeText, date: date });
+                        }
+                    }
+                });
+            }
+            
+            // Find the most recent datetime
+            let mostRecent = null;
+            let mostRecentDate = null;
+            datetimes.forEach(dt => {
+                if (!mostRecentDate || dt.date > mostRecentDate) {
+                    mostRecent = dt.text;
+                    mostRecentDate = dt.date;
+                }
+            });
+            
+            console.log('Fetched page: Found', datetimes.length, 'datetimes, most recent:', mostRecent, mostRecentDate);
+            return { text: mostRecent, date: mostRecentDate, allDatetimes: datetimes };
+        })
+        .catch(error => {
+            console.error('Error fetching latest posts:', error);
+            return null;
+        });
+    }
+    
+    function monitorForNewPosts() {
+        let checkInterval = null;
+        let isUserTyping = false;
+        let typingTimeout = null;
+        
+        // Function to check for new posts (both local DOM and fetched page)
+        const checkForNewPosts = () => {
+            // Don't check if user is actively typing
+            if (isUserTyping) {
+                console.log('Skipping new post check - user is actively typing');
+                return;
+            }
+            
+            // First check local DOM (in case posts were added dynamically)
+            const localMostRecent = getMostRecentPostDatetime();
+            const referenceDatetime = userStartedWriting ? datetimeWhenWritingStarted : initialMostRecentDatetime;
+            
+            // Then fetch the page to check for new posts on the server
+            fetchLatestPostDatetimes()
+                .then(fetchedData => {
+                    if (!fetchedData || !fetchedData.date) {
+                        console.log('Could not fetch latest datetimes, using local check only');
+                        // Fall back to local check
+                        checkLocalPosts(localMostRecent, referenceDatetime);
+                        return;
+                    }
+                    
+                    // Compare fetched data with reference
+                    if (referenceDatetime && fetchedData.date > referenceDatetime) {
+                        // Count new posts from fetched data
+                        const newPostCount = fetchedData.allDatetimes.filter(dt => 
+                            dt.date > referenceDatetime
+                        ).length;
+                        
+                        if (newPostCount > 0) {
+                            if (!newPostsDetected || fetchedData.date > currentMostRecentDatetime) {
+                                newPostsDetected = true;
+                                currentMostRecentDatetime = fetchedData.date;
+                                console.log(`New posts detected from server! ${newPostCount} new post(s) since ${userStartedWriting ? 'writing started' : 'page load'}.`);
+                                
+                                // Show a visual indicator
+                                showNewPostIndicator(newPostCount);
+                            }
+                        }
+                    } else {
+                        // Also check local posts in case they were added to DOM
+                        checkLocalPosts(localMostRecent, referenceDatetime);
+                    }
+                });
+        };
+        
+        // Helper function to check local DOM posts
+        const checkLocalPosts = (localMostRecent, referenceDatetime) => {
+            if (localMostRecent.date && referenceDatetime && localMostRecent.date > referenceDatetime) {
+                if (!newPostsDetected || localMostRecent.date > currentMostRecentDatetime) {
+                    newPostsDetected = true;
+                    currentMostRecentDatetime = localMostRecent.date;
+                    const newPostCount = getNewPostCount();
+                    if (newPostCount > 0) {
+                        console.log(`New posts detected in DOM! ${newPostCount} new post(s) since ${userStartedWriting ? 'writing started' : 'page load'}.`);
+                        showNewPostIndicator(newPostCount);
+                    }
+                }
+            }
+        };
+        
+        // Track when user is typing in form fields
+        const form = document.querySelector('form[name="postForm"]');
+        if (form) {
+            const messageTextarea = form.querySelector('textarea[name="message"], #message');
+            const postNameInput = form.querySelector('input[name="post_name"], #post_name');
+            
+            const markUserTyping = () => {
+                isUserTyping = true;
+                // Clear existing timeout
+                if (typingTimeout) {
+                    clearTimeout(typingTimeout);
+                }
+                // Reset typing flag after 5 seconds of inactivity
+                typingTimeout = setTimeout(() => {
+                    isUserTyping = false;
+                    console.log('User stopped typing, resuming new post checks');
+                }, 5000);
+            };
+            
+            if (messageTextarea) {
+                messageTextarea.addEventListener('input', markUserTyping);
+                messageTextarea.addEventListener('keydown', markUserTyping);
+            }
+            
+            if (postNameInput) {
+                postNameInput.addEventListener('input', markUserTyping);
+                postNameInput.addEventListener('keydown', markUserTyping);
+            }
+        }
+        
+        // Check periodically (every 60 seconds to avoid too many requests)
+        checkInterval = setInterval(checkForNewPosts, 60000);
+        
+        // Also check after DOM mutations (hooked into existing observer via transformPage calls)
+        // This will be called by the existing MutationObserver
+        window.checkForNewPosts = checkForNewPosts;
+    }
+    
+    function showNewPostIndicator(count) {
+        // Remove existing indicator if present
+        const existingIndicator = document.getElementById('new-posts-indicator');
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+        
+        // Create indicator
+        const indicator = document.createElement('div');
+        indicator.id = 'new-posts-indicator';
+        indicator.className = 'new-posts-indicator';
+        const message = userStartedWriting 
+            ? `${count} new post${count > 1 ? 's' : ''} detected since you started writing`
+            : `${count} new post${count > 1 ? 's' : ''} detected since page load`;
+        indicator.innerHTML = `
+            <span class="indicator-icon">⚠️</span>
+            <span class="indicator-text">${message}</span>
+            <button class="indicator-dismiss" onclick="this.parentElement.remove()">×</button>
+        `;
+        
+        // Find the submit button and insert indicator right after it
+        const form = document.querySelector('form[name="postForm"]');
+        if (form) {
+            const submitButton = form.querySelector('input[type="button"].submit, button.submit, input.submit');
+            if (submitButton) {
+                // Check if form is using modern layout
+                const submitSection = submitButton.closest('.form-submit-section');
+                if (submitSection) {
+                    // Modern layout - insert after submit section
+                    submitSection.parentNode.insertBefore(indicator, submitSection.nextSibling);
+                } else {
+                    // Old table layout - find the parent cell (td) that contains the submit button
+                    const submitCell = submitButton.closest('td');
+                    if (submitCell) {
+                        const submitRow = submitCell.closest('tr');
+                        if (submitRow) {
+                            // Create a new row for the indicator
+                            const indicatorRow = document.createElement('tr');
+                            const indicatorCell = document.createElement('td');
+                            indicatorCell.colSpan = 3;
+                            indicatorCell.style.textAlign = 'center';
+                            indicatorCell.style.paddingTop = '10px';
+                            indicatorCell.appendChild(indicator);
+                            indicatorRow.appendChild(indicatorCell);
+                            
+                            // Insert after the submit button's row
+                            submitRow.parentNode.insertBefore(indicatorRow, submitRow.nextSibling);
+                        } else {
+                            // Fallback: insert in the same cell after the button
+                            submitCell.appendChild(indicator);
+                        }
+                    } else {
+                        // Fallback: insert after the submit button
+                        submitButton.parentNode.insertBefore(indicator, submitButton.nextSibling);
+                    }
+                }
+            } else {
+                // Fallback: insert before the form
+                form.parentNode.insertBefore(indicator, form);
+            }
+        } else {
+            // Fallback: insert at top of body
+            document.body.insertBefore(indicator, document.body.firstChild);
+        }
+    }
+    
+    function interceptFormSubmission() {
+        // Find the form
+        const form = document.querySelector('form[name="postForm"]');
+        if (!form) {
+            // Try again later if form not found
+            setTimeout(interceptFormSubmission, 1000);
+            return;
+        }
+        
+        // Helper function to handle submission with all checks
+        const handleSubmission = function(e) {
+            // Prevent double-submission
+            if (isSubmitting) {
+                return; // Already processing submission
+            }
+            
+            // Always prevent default first
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            
+            // Check for new posts - fetch latest data from server
+            console.log('=== Checking for new posts before submission ===');
+            const referenceDatetime = userStartedWriting ? datetimeWhenWritingStarted : initialMostRecentDatetime;
+            console.log('Reference datetime:', referenceDatetime, '(userStartedWriting:', userStartedWriting, ')');
+            
+            // Fetch latest data and check
+            fetchLatestPostDatetimes()
+                .then(fetchedData => {
+                    let hasNewPosts = false;
+                    let newPostCount = 0;
+                    
+                    if (fetchedData && fetchedData.date && referenceDatetime && fetchedData.date > referenceDatetime) {
+                        // Count new posts from fetched data
+                        newPostCount = fetchedData.allDatetimes.filter(dt => 
+                            dt.date > referenceDatetime
+                        ).length;
+                        hasNewPosts = newPostCount > 0;
+                        console.log('Fetched data: Most recent datetime:', fetchedData.date);
+                        console.log('Has new posts?', hasNewPosts, '(newPostCount:', newPostCount, ')');
+                    } else {
+                        // Fallback to local check
+                        const mostRecent = getMostRecentPostDatetime();
+                        console.log('Using local check: Most recent datetime:', mostRecent.date);
+                        newPostCount = getNewPostCount();
+                        hasNewPosts = mostRecent.date && referenceDatetime && mostRecent.date > referenceDatetime && newPostCount > 0;
+                        console.log('Has new posts?', hasNewPosts, '(newPostCount:', newPostCount, ')');
+                    }
+                    
+                    // Step 1: Check for new posts and warn if needed
+                    if (hasNewPosts) {
+                        proceedWithSubmission(newPostCount);
+                    } else {
+                        // No new posts, proceed directly to confirmation
+                        proceedWithSubmission(0);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking for new posts:', error);
+                    // On error, fall back to local check
+                    const mostRecent = getMostRecentPostDatetime();
+                    const newPostCount = getNewPostCount();
+                    const hasNewPosts = mostRecent.date && referenceDatetime && mostRecent.date > referenceDatetime && newPostCount > 0;
+                    proceedWithSubmission(hasNewPosts ? newPostCount : 0);
+                });
+            
+            // Helper function to proceed with submission after checking for new posts
+            function proceedWithSubmission(newPostCount) {
+                // Step 1: Check for new posts and warn if needed
+                if (newPostCount > 0) {
+                    const continueSubmission = confirm(
+                        `⚠️ Warning: ${newPostCount} new post${newPostCount > 1 ? 's have' : ' has'} been detected since you started writing your post.\n\n` +
+                        `Would you like to review the new posts before submitting?\n\n` +
+                        `Click "OK" to continue with submission, or "Cancel" to review posts first.`
+                    );
+                    
+                    if (!continueSubmission) {
+                        // User clicked Cancel - wants to review posts
+                        scrollToNewPosts();
+                        return false;
+                    }
+                    // User clicked OK - wants to continue, proceed to general confirmation
+                }
+                
+                // Step 2: Show general submission confirmation
+                const confirmSubmission = confirm(
+                    `Are you sure you want to submit this post?\n\n` +
+                    `Click "OK" to submit, or "Cancel" to go back and edit.`
+                );
+                
+                if (confirmSubmission) {
+                    // User confirmed - set flag and submit
+                    isSubmitting = true;
+                    form.removeEventListener('submit', handleSubmission);
+                    form.submit();
+                } else {
+                    // User cancelled - do nothing, let them continue editing
+                    return false;
+                }
+            }
+        };
+        
+        // Intercept form submission
+        form.addEventListener('submit', handleSubmission, true); // Use capture phase to intercept early
+        
+        // Also intercept button clicks as backup
+        const submitButton = form.querySelector('input[type="button"].submit, button.submit, input.submit');
+        if (submitButton) {
+            submitButton.addEventListener('click', function(e) {
+                // Prevent double-submission
+                if (isSubmitting) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+                
+                // Prevent default action
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                
+                // Check for new posts - fetch latest data from server
+                console.log('=== Checking for new posts before submission (button click) ===');
+                const referenceDatetime = userStartedWriting ? datetimeWhenWritingStarted : initialMostRecentDatetime;
+                console.log('Reference datetime:', referenceDatetime, '(userStartedWriting:', userStartedWriting, ')');
+                
+                // Fetch latest data and check
+                fetchLatestPostDatetimes()
+                    .then(fetchedData => {
+                        let hasNewPosts = false;
+                        let newPostCount = 0;
+                        
+                        if (fetchedData && fetchedData.date && referenceDatetime && fetchedData.date > referenceDatetime) {
+                            // Count new posts from fetched data
+                            newPostCount = fetchedData.allDatetimes.filter(dt => 
+                                dt.date > referenceDatetime
+                            ).length;
+                            hasNewPosts = newPostCount > 0;
+                            console.log('Fetched data: Most recent datetime:', fetchedData.date);
+                            console.log('Has new posts?', hasNewPosts, '(newPostCount:', newPostCount, ')');
+                        } else {
+                            // Fallback to local check
+                            const mostRecent = getMostRecentPostDatetime();
+                            console.log('Using local check: Most recent datetime:', mostRecent.date);
+                            newPostCount = getNewPostCount();
+                            hasNewPosts = mostRecent.date && referenceDatetime && mostRecent.date > referenceDatetime && newPostCount > 0;
+                            console.log('Has new posts?', hasNewPosts, '(newPostCount:', newPostCount, ')');
+                        }
+                        
+                        // Step 1: Check for new posts and warn if needed
+                        if (hasNewPosts) {
+                            proceedWithSubmissionButton(newPostCount);
+                        } else {
+                            // No new posts, proceed directly to confirmation
+                            proceedWithSubmissionButton(0);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking for new posts:', error);
+                        // On error, fall back to local check
+                        const mostRecent = getMostRecentPostDatetime();
+                        const newPostCount = getNewPostCount();
+                        const hasNewPosts = mostRecent.date && referenceDatetime && mostRecent.date > referenceDatetime && newPostCount > 0;
+                        proceedWithSubmissionButton(hasNewPosts ? newPostCount : 0);
+                    });
+                
+                // Helper function to proceed with submission after checking for new posts
+                function proceedWithSubmissionButton(newPostCount) {
+                    // Step 1: Check for new posts and warn if needed
+                    if (newPostCount > 0) {
+                        const continueSubmission = confirm(
+                            `⚠️ Warning: ${newPostCount} new post${newPostCount > 1 ? 's have' : ' has'} been detected since you started writing your post.\n\n` +
+                            `Would you like to review the new posts before submitting?\n\n` +
+                            `Click "OK" to continue with submission, or "Cancel" to review posts first.`
+                        );
+                        
+                        if (!continueSubmission) {
+                            // User clicked Cancel - wants to review posts
+                            scrollToNewPosts();
+                            return false;
+                        }
+                        // User clicked OK - wants to continue, proceed to general confirmation
+                    }
+                    
+                    // Step 2: Show general submission confirmation
+                    const confirmSubmission = confirm(
+                        `Are you sure you want to submit this post?\n\n` +
+                        `Click "OK" to submit, or "Cancel" to go back and edit.`
+                    );
+                    
+                    if (confirmSubmission) {
+                        // User confirmed - set flag and trigger form submission
+                        isSubmitting = true;
+                        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    } else {
+                        // User cancelled - do nothing
+                        return false;
+                    }
+                }
+            }, true);
+        }
+    }
+    
+    function scrollToNewPosts() {
+        // Find the first new post (posts newer than the reference datetime)
+        const referenceDatetime = userStartedWriting ? datetimeWhenWritingStarted : initialMostRecentDatetime;
+        if (!referenceDatetime) {
+            // Fallback: scroll to top of posts section
+            const firstPost = document.querySelector('.character-post');
+            if (firstPost) {
+                firstPost.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            return;
+        }
+        
+        const allPosts = document.querySelectorAll('.character-post');
+        let firstNewPost = null;
+        
+        // Find the first post with a datetime newer than the reference
+        allPosts.forEach(post => {
+            if (firstNewPost) return; // Already found
+            
+            const datetimeElement = post.querySelector('.post-datetime');
+            if (datetimeElement) {
+                const datetimeText = datetimeElement.textContent.trim();
+                const date = parseDatetime(datetimeText);
+                
+                if (date && date > referenceDatetime) {
+                    firstNewPost = post;
+                }
+            }
+        });
+        
+        if (firstNewPost) {
+            firstNewPost.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Highlight the new posts
+            highlightNewPosts();
+        } else {
+            // Fallback: scroll to top of posts section
+            const firstPost = document.querySelector('.character-post');
+            if (firstPost) {
+                firstPost.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    }
+    
+    function highlightNewPosts() {
+        // Remove existing highlights
+        document.querySelectorAll('.new-post-highlight').forEach(el => {
+            el.classList.remove('new-post-highlight');
+        });
+        
+        // Highlight new posts (posts newer than the reference datetime)
+        const referenceDatetime = userStartedWriting ? datetimeWhenWritingStarted : initialMostRecentDatetime;
+        if (!referenceDatetime) return;
+        
+        const allPosts = document.querySelectorAll('.character-post');
+        allPosts.forEach(post => {
+            const datetimeElement = post.querySelector('.post-datetime');
+            if (datetimeElement) {
+                const datetimeText = datetimeElement.textContent.trim();
+                const date = parseDatetime(datetimeText);
+                
+                if (date && date > referenceDatetime) {
+                    post.classList.add('new-post-highlight');
+                }
+            }
+        });
+        
+        // Remove highlight after 5 seconds
+        setTimeout(() => {
+            document.querySelectorAll('.new-post-highlight').forEach(el => {
+                el.classList.remove('new-post-highlight');
+            });
+        }, 5000);
+    }
 })();
 

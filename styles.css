@@ -1029,3 +1029,311 @@ body.wold-transformed #bbcode-preview em {
     color: rgb(203, 201, 201);
 }
 
+/* New post detection indicator */
+.new-posts-indicator {
+    background-color: #ff6b35;
+    color: #ffffff;
+    padding: 12px 20px;
+    margin: 15px 0;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 8px rgba(255, 107, 53, 0.3);
+    font-weight: bold;
+    position: relative;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.new-posts-indicator .indicator-icon {
+    font-size: 1.2em;
+}
+
+.new-posts-indicator .indicator-text {
+    flex: 1;
+}
+
+.new-posts-indicator .indicator-dismiss {
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-size: 1.5em;
+    cursor: pointer;
+    padding: 0 8px;
+    line-height: 1;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.new-posts-indicator .indicator-dismiss:hover {
+    opacity: 1;
+}
+
+/* Highlight for new posts */
+.character-post.new-post-highlight {
+    animation: highlightPulse 2s ease-in-out;
+    border: 2px solid #ff6b35 !important;
+    box-shadow: 0 0 20px rgba(255, 107, 53, 0.5) !important;
+}
+
+@keyframes highlightPulse {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(255, 107, 53, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 30px rgba(255, 107, 53, 0.8);
+    }
+}
+
+/* Modern Form Layout - Clean div-based structure */
+.modern-form-wrapper {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #1a1a1a;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.form-section {
+    margin-bottom: 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.form-section:last-child {
+    margin-bottom: 0;
+}
+
+.form-label {
+    color: rgb(203, 201, 201);
+    font-size: 14px;
+    font-weight: normal;
+    margin-bottom: 5px;
+}
+
+.form-label b,
+.form-label strong {
+    color: rgb(188, 121, 121);
+    font-weight: bold;
+}
+
+.form-label-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.form-input-wrapper {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-input-wrapper input[type="text"],
+.form-input-wrapper textarea {
+    width: 100%;
+    padding: 10px;
+    background-color: #121212;
+    border: 1px solid rgb(64, 64, 64);
+    border-radius: 5px;
+    color: rgb(203, 201, 201);
+    font-family: Verdana, sans-serif;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.form-input-wrapper input[type="text"]:focus,
+.form-input-wrapper textarea:focus {
+    outline: none;
+    border-color: rgb(125, 164, 212);
+    box-shadow: 0 0 5px rgba(125, 164, 212, 0.3);
+}
+
+.form-input-wrapper textarea {
+    min-height: 150px;
+    resize: vertical;
+    font-family: Verdana, sans-serif;
+    line-height: 1.5;
+}
+
+.form-controls-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.dice-buttons-wrapper {
+    gap: 5px;
+}
+
+.dice-buttons-wrapper .diebutton {
+    padding: 8px 12px;
+    background-color: rgb(64, 64, 64);
+    border: 1px solid rgb(90, 90, 90);
+    border-radius: 5px;
+    color: rgb(203, 201, 201);
+    cursor: pointer;
+    font-family: Verdana, sans-serif;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.dice-buttons-wrapper .diebutton:hover {
+    background-color: rgb(90, 90, 90);
+    border-color: rgb(125, 164, 212);
+    color: rgb(125, 164, 212);
+}
+
+.multiroll-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.multiroll-wrapper input[type="text"],
+.multiroll-wrapper select,
+.multiroll-wrapper input[type="button"] {
+    padding: 6px 10px;
+    background-color: #121212;
+    border: 1px solid rgb(64, 64, 64);
+    border-radius: 5px;
+    color: rgb(203, 201, 201);
+    font-family: Verdana, sans-serif;
+    font-size: 13px;
+}
+
+.multiroll-wrapper input[type="text"] {
+    width: 50px;
+}
+
+.multiroll-wrapper select {
+    padding: 6px 8px;
+}
+
+.multiroll-wrapper input[type="button"] {
+    padding: 6px 15px;
+    background-color: rgb(64, 64, 64);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.multiroll-wrapper input[type="button"]:hover {
+    background-color: rgb(90, 90, 90);
+    border-color: rgb(125, 164, 212);
+}
+
+.form-checkbox-section {
+    align-items: center;
+}
+
+.form-checkbox-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-checkbox-wrapper input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    cursor: pointer;
+    accent-color: rgb(125, 164, 212);
+}
+
+.form-checkbox-wrapper label {
+    margin: 0;
+    cursor: pointer;
+}
+
+.form-submit-section {
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgb(64, 64, 64);
+}
+
+.form-submit-section .submit {
+    padding: 12px 40px;
+    font-size: 16px;
+    font-weight: bold;
+    background-color: rgb(64, 64, 64);
+    border: 1px solid rgb(90, 90, 90);
+    border-radius: 5px;
+    color: rgb(203, 201, 201);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: Verdana, sans-serif;
+}
+
+.form-submit-section .submit:hover {
+    background-color: rgb(90, 90, 90);
+    border-color: rgb(125, 164, 212);
+    color: rgb(125, 164, 212);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.form-error-section {
+    margin-bottom: 20px;
+}
+
+.form-error-section .error {
+    background-color: rgb(45, 28, 28);
+    color: rgb(188, 121, 121);
+    padding: 12px;
+    border-radius: 5px;
+    border: 1px solid rgb(64, 64, 64);
+    text-align: center;
+}
+
+.form-preview-section {
+    margin-top: -10px;
+    margin-bottom: 15px;
+}
+
+/* Ensure BBCode toolbar works in new layout */
+.modern-form-wrapper .bbcode-toolbar {
+    margin-bottom: 10px;
+}
+
+.modern-form-wrapper #preview-btn {
+    margin-top: 8px;
+    align-self: flex-start;
+}
+
+/* Die rolls display in new layout */
+.modern-form-wrapper #rollsdiv {
+    background-color: #1a1a1a;
+    color: rgb(203, 201, 201);
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid rgb(64, 64, 64);
+    min-height: 30px;
+    font-family: 'Courier New', monospace;
+    color: #ffaa44;
+}
+
+.modern-form-wrapper #explanation {
+    color: rgb(112, 112, 112);
+    font-style: italic;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+

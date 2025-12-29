@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DarkWold",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Transforms WoldianGames pages to a cleaner, more readable dark-themed format with improved post structure and BBCode tools",
   "author": "Berthok",
   "homepage_url": "https://github.com/berthok/darkwold-browser-extension",
@@ -27,6 +27,8 @@
       "matches": [
         "https://www.woldiangames.com/games/index.php*",
         "https://www.woldiangames.com/archives/index.php*",
+        "https://www.woldiangames.com//archives/index.php*",
+        "https://www.woldiangames.com/include/layout/editPost.php*",
         "https://www.woldiangames.com/woldiangames.htm",
         "https://www.woldiangames.com/games_index_career.htm",
         "https://www.woldiangames.com/games_index_gg_tap.htm",
