@@ -22,11 +22,25 @@ A browser extension for Firefox and Chrome that transforms WoldianGames pages in
 - Toolbar with buttons for common BBCode tags (Dialogue, OOC, Bold, Italic, Underline, Link, Center, Blockquote, Spoiler)
 - Message preview that updates automatically as you type
 - Refresh Preview button below the "Message:" label
+- Available on both new post forms and edit post forms
+
+### Post Form Enhancements
+- **Modern Form Layout**: Transformed from table-based to clean, intuitive div-based layout
+- **New Post Detection**: Automatically monitors for new posts while you're writing
+  - Checks for new posts every 2 minutes
+  - Pauses checks while you're actively typing
+  - Compares post datetimes to detect truly new content
+- **Submission Confirmation**: Two-step confirmation process when submitting posts
+  - First: Warns if new posts have been detected since you started writing
+  - Second: General confirmation to prevent accidental submissions
+- **New Post Indicator**: Visual alert displayed below the submit button when new posts are detected
+- **Edit Post Support**: Edit post pages are fully styled with dark theme and modern form layout
 
 ### Page Support
 The extension works on:
 - Game pages (`/games/index.php*`)
-- Archive pages (`/archives/index.php*`)
+- Archive pages (`/archives/index.php*` and `//archives/index.php*`)
+- Edit post pages (`/include/layout/editPost.php*`)
 - Main index page (`woldiangames.htm`)
 - Career games index (`games_index_career.htm`)
 - Giggling Ghost & Tapestry games index (`games_index_gg_tap.htm`)
@@ -36,8 +50,9 @@ The extension works on:
 ### Additional Features
 - Spoiler tags transformed to "Highlight to display spoiler" format
 - Header section navigation styling
-- Form styling improvements with compact layout
 - Report button table styling for dark theme
+- Edit Post links work correctly (preserves javascript: protocol links)
+- All post links open in new tabs (except Edit Post links)
 
 ## Installation
 
